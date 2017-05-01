@@ -6,11 +6,15 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const request = require('request');
 const path = require('path');
+const host = 'https://petal-bus.glitch.me/'
 var messengerButton = "<html><head><title>Facebook Messenger Bot</title></head><body><h1>Facebook Messenger Bot</h1>This is a bot based on Messenger Platform QuickStart. For more details, see their <a href=\"https://developers.facebook.com/docs/messenger-platform/guides/quick-start\">docs</a>.<script src=\"https://button.glitch.me/button.js\" data-style=\"glitch\"></script><div class=\"glitchButton\" style=\"position:fixed;top:20px;right:20px;\"></div></body></html>";
+var ilikeit = '<html><head><title>OK sounds nice!</title><link rel="stylesheet" type="text/css" href="./css/ilikeit.css"></head><body></body></html>'
+var nope = '<html><head><title>Oh No!</title><link rel="stylesheet" type="text/css" href="./css/nope.css"></head><body></body></html>'
 
 // The rest of the code implements the routes for our Express server.
 let app = express();
 
+app.use(express.static('public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: true
@@ -34,6 +38,15 @@ app.get('/', function(req, res) {
   res.write(messengerButton);
   res.end();
 });
+
+app.get('/ilikeit', function(req, res) {
+  res.writeHead(200, {'Content-Type': 'text/html'});res.write(ilikeit);res.end();
+});
+
+app.get('/nope', function(req, res) {
+  res.writeHead(200, {'Content-Type': 'text/html'});res.write(nope);res.end();
+});
+
 
 // Message processing
 app.post('/webhook', function (req, res) {
@@ -92,6 +105,8 @@ function receivedMessage(event) {
       case 'generic':
         console.log('--93--')
         sendGenericMessage(senderID);
+        break;
+      case 'r': sendRamen(senderID) 
         break;
       case 'ramen': sendRamen(senderID) 
         break;
@@ -201,8 +216,8 @@ function sendRamen(recipientId) {
             {title: "Jirorian",subtitle: "Next-generation Ramen Restaurant",item_url: "https://tabelog.com/tokyo/A1308/A130801/13184422/",               
             image_url: "https://tabelog.ssl.k-img.com/restaurant/images/Rvw/40445/640x640_rect_40445111.jpg",
             buttons: [
-              {type: "web_url",url: "https://www.oculus.com/en-us/rift/",title: "like it"}, 
-              {type: "web_url",url: "https://www.oculus.com/en-us/rift/",title: "nope"}, 
+              {type: "web_url",url: host + "/ilikeit",title: "like it"}, 
+              {type: "web_url",url: host + "/nope",title: "nope"}, 
                       {
               type: "postback",
               title: "Call Postback",
