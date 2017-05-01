@@ -2,19 +2,17 @@
 // This is main file containing code implementing the Express server and functionality for the Express echo bot.
 //
 'use strict';
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const request = require('request');
 const path = require('path');
 const host = 'https://petal-bus.glitch.me/'
-var messengerButton = "<html><head><title>Facebook Messenger Bot</title></head><body><h1>Facebook Messenger Bot</h1>This is a bot based on Messenger Platform QuickStart. For more details, see their <a href=\"https://developers.facebook.com/docs/messenger-platform/guides/quick-start\">docs</a>.<script src=\"https://button.glitch.me/button.js\" data-style=\"glitch\"></script><div class=\"glitchButton\" style=\"position:fixed;top:20px;right:20px;\"></div></body></html>";
-var ilikeit = '<html><head><title>OK sounds nice!</title><link rel="stylesheet" type="text/css" href="./css/ilikeit.css"></head><body></body></html>'
-var nope = '<html><head><title>Oh No!</title><link rel="stylesheet" type="text/css" href="./css/nope.css"></head><body></body></html>'
-
-// The rest of the code implements the routes for our Express server.
+const ramenConfig = require('./ramenConfig')
+const _ = require('underscore')
+const argConfig = require('./argConfig')
 let app = express();
 
-app.use(express.static('public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: true
@@ -24,7 +22,7 @@ app.use(bodyParser.urlencoded({
 app.get('/webhook', function(req, res) {
   if (req.query['hub.mode'] === 'subscribe' &&
       req.query['hub.verify_token'] === process.env.VERIFY_TOKEN) {
-    console.log("Validating webhook");
+    //console.log("Validating webhook");
     res.status(200).send(req.query['hub.challenge']);
   } else {
     console.error("Failed validation. Make sure the validation tokens match.");
@@ -32,25 +30,9 @@ app.get('/webhook', function(req, res) {
   }
 });
 
-// Display the web page
-app.get('/', function(req, res) {
-  res.writeHead(200, {'Content-Type': 'text/html'});
-  res.write(messengerButton);
-  res.end();
-});
-
-app.get('/ilikeit', function(req, res) {
-  res.writeHead(200, {'Content-Type': 'text/html'});res.write(ilikeit);res.end();
-});
-
-app.get('/nope', function(req, res) {
-  res.writeHead(200, {'Content-Type': 'text/html'});res.write(nope);res.end();
-});
-
-
 // Message processing
 app.post('/webhook', function (req, res) {
-  console.log(req.body);
+  //console.log(req.body);
   var data = req.body;
 
   // Make sure this is a page subscription
@@ -66,7 +48,7 @@ app.post('/webhook', function (req, res) {
         if (event.message) {
           receivedMessage(event);
         } else if (event.postback) {
-          receivedPostback(event);   
+          //receivedPostback(event);   
         } else {
           console.log("Webhook received unknown event: ", event);
         }
@@ -82,15 +64,31 @@ app.post('/webhook', function (req, res) {
   }
 });
 
+function checkLength(msg){
+  console.log('-----------67----------')
+  if(!msg) return false
+  let kekka = msg.split(" ");
+  if (kekka.length !== 3){
+    return false
+  } else {
+    console.log('-----------93----------')
+    return true
+  } 
+}
+
 // Incoming events handling
 function receivedMessage(event) {
+//  console.log('-----------ramenConfig----------')
+//  console.log(ramenConfig)
+//  console.log(ramenConfig.data)
+  
   var senderID = event.sender.id;
   var recipientID = event.recipient.id;
   var timeOfMessage = event.timestamp;
   var message = event.message;
 
   console.log("Received message for user %d and page %d at %d with message:", 
-    senderID, recipientID, timeOfMessage);
+  senderID, recipientID, timeOfMessage);
   console.log(JSON.stringify(message));
 
   var messageId = message.mid;
@@ -99,49 +97,43 @@ function receivedMessage(event) {
   var messageAttachments = message.attachments;
 
   if (messageText) {
+    if (!checkLength(messageText)) {
+        sendTextMessage(senderID, "plz send a message like below\n"
+                        + "[location] [food-type] [review-star]\n"
+                        + "(3words and be splitted by space, english only))\n\n"
+                        + "aka wa 2 (赤坂 和食 星2)\n"
+                        + "koji you 3 (麹町 洋食 星3)\n"
+                        + "hanzo ramen 2 (半蔵門 ラーメン 星2)\n"
+                        + "hanzo sakana 3 (半蔵門 魚 星3)\n"
+                        + "ropp miso 2 (六本木 味噌ラーメン 星2)\n"
+                        + "shibu ie all (渋谷 家系 星全種)\n"
+                       );
+      return      
+    }
+    
+    var kekka = messageText.split(" ");
+    var match = false
+    match = _.find(argConfig.firstList, function(obj){ return obj == kekka[0] })
+    if(!match) {
+      sendTextMessage(senderID, "these locations are available [" + argConfig.firstList.join(',') + "]");
+      return
+    }
+
+    match = _.find(argConfig.secondList, function(obj){ return obj == kekka[1] })
+    if(!match) {
+      sendTextMessage(senderID, "these food tyes are available [" + argConfig.secondList.join(',') + "]");
+      return
+    }
+
     // If we receive a text message, check to see if it matches a keyword
     // and send back the template example. Otherwise, just echo the text we received.
-    switch (messageText) {
-      case 'generic':
-        console.log('--93--')
-        sendGenericMessage(senderID);
-        break;
-      case 'r': sendRamen(senderID) 
-        break;
-      case 'ramen': sendRamen(senderID) 
-        break;
-
-      default:
-        console.log('--98--')
-        console.log(senderID)
-
-        sendTextMessage(senderID, messageText);
-    }
+    sendRamen(senderID, messageText)
+    sendTextMessage(senderID, messageText);
   } else if (messageAttachments) {
     sendTextMessage(senderID, "plz text me!");
   }
 }
 
-function receivedPostback(event) {
-  var senderID = event.sender.id;
-  var recipientID = event.recipient.id;
-  var timeOfPostback = event.timestamp;
-
-  // The 'payload' param is a developer-defined field which is set in a postback 
-  // button for Structured Messages. 
-  var payload = event.postback.payload;
-
-  console.log("Received postback for user %d and page %d with payload '%s' " + 
-    "at %d", senderID, recipientID, payload, timeOfPostback);
-
-  // When a postback is called, we'll send a message back to the sender to 
-  // let them know it was successful
-  sendTextMessage(senderID, "Postback called");
-}
-
-//////////////////////////
-// Sending helpers
-//////////////////////////
 function sendTextMessage(recipientId, messageText) {
   var messageData = {
     recipient: {
@@ -151,58 +143,29 @@ function sendTextMessage(recipientId, messageText) {
       text: messageText
     }
   };
-
   callSendAPI(messageData);
 }
 
-function sendGenericMessage(recipientId) {
-  var messageData = {
-    recipient: {
-      id: recipientId
-    },
-    message: {
-      attachment: {
-        type: "template",
-        payload: {
-          template_type: "generic",
-          elements: [{
-            title: "rift",
-            subtitle: "Next-generation virtual reality",
-            item_url: "https://www.oculus.com/en-us/rift/",               
-            image_url: "http://messengerdemo.parseapp.com/img/rift.png",
-            buttons: [{
-              type: "web_url",
-              url: "https://www.oculus.com/en-us/rift/",
-              title: "Open Web URL"
-            }, {
+var elem0 = {
+title: "Jirorian",
+subtitle: "Next-generation Ramen Restaurant",
+item_url: "https://tabelog.com/tokyo/A1308/A130801/13184422/",               
+image_url: "https://tabelog.ssl.k-img.com/restaurant/images/Rvw/40445/640x640_rect_40445111.jpg"
+}
+ 
+var buttons = [
+              {type: "web_url",url: host + "/ilikeit",title: "like it"}, 
+              {type: "web_url",url: host + "/nope",title: "nope"}, 
+                      {
               type: "postback",
               title: "Call Postback",
               payload: "Payload for first bubble",
-            }],
-          }, {
-            title: "touch",
-            subtitle: "Your Hands, Now in VR",
-            item_url: "https://www.oculus.com/en-us/touch/",               
-            image_url: "http://messengerdemo.parseapp.com/img/touch.png",
-            buttons: [{
-              type: "web_url",
-              url: "https://www.oculus.com/en-us/touch/",
-              title: "Open Web URL"
-            }, {
-              type: "postback",
-              title: "Call Postback",
-              payload: "Payload for second bubble",
             }]
-          }]
-        }
-      }
-    }
-  };  
 
-  callSendAPI(messageData);
-}
-
-function sendRamen(recipientId) {
+function sendRamen(recipientId, messageText) {
+     
+  
+  
     var messageData = {
     recipient: {
       id: recipientId
@@ -213,31 +176,18 @@ function sendRamen(recipientId) {
         payload: {
           template_type: "generic",
           elements: [
-            {title: "Jirorian",subtitle: "Next-generation Ramen Restaurant",item_url: "https://tabelog.com/tokyo/A1308/A130801/13184422/",               
-            image_url: "https://tabelog.ssl.k-img.com/restaurant/images/Rvw/40445/640x640_rect_40445111.jpg",
-            buttons: [
-              {type: "web_url",url: host + "/ilikeit",title: "like it"}, 
-              {type: "web_url",url: host + "/nope",title: "nope"}, 
-                      {
-              type: "postback",
-              title: "Call Postback",
-              payload: "Payload for first bubble",
-            }],
+            {
+              title: "Jirorian",subtitle: "Next-generation Ramen Restaurant",
+              item_url: "https://tabelog.com/tokyo/A1308/A130801/13184422/",               
+              image_url: "https://tabelog.ssl.k-img.com/restaurant/images/Rvw/40445/640x640_rect_40445111.jpg",
+            //buttons: ,
           }, {
             title: "touch",
             subtitle: "Your Hands, Now in VR",
             item_url: "https://www.oculus.com/en-us/touch/",               
             image_url: "http://messengerdemo.parseapp.com/img/touch.png",
-            buttons: [{
-              type: "web_url",
-              url: "https://www.oculus.com/en-us/touch/",
-              title: "Open Web URL"
-            }, {
-              type: "postback",
-              title: "Call Postback",
-              payload: "Payload for second bubble",
-            }]
-          }]
+            
+          }, elem0,elem0,elem0,elem0,elem0,elem0,elem0,elem0]
         }
       }
     }
