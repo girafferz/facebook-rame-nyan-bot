@@ -8,7 +8,7 @@ const bodyParser = require('body-parser');
 const request = require('request');
 const path = require('path');
 const host = 'https://petal-bus.glitch.me/'
-const ramenConfig = require('./ramenConfig')
+const dataConfig = require('./dataConfig')
 const _ = require('underscore')
 const argConfig = require('./argConfig')
 let app = express();
@@ -65,13 +65,11 @@ app.post('/webhook', function (req, res) {
 });
 
 function checkLength(msg){
-  console.log('-----------67----------')
   if(!msg) return false
   let kekka = msg.split(" ");
   if (kekka.length !== 3){
     return false
   } else {
-    console.log('-----------93----------')
     return true
   } 
 }
@@ -102,7 +100,7 @@ function receivedMessage(event) {
                         + "[location] [food-type] [review-star]\n"
                         + "(3words and be splitted by space, english only))\n\n"
                         + "aka wa 2 (赤坂 和食 星2)\n"
-                        + "koji you 3 (麹町 洋食 星3)\n"
+                        + "koji yo 3 (麹町 洋食 星3)\n"
                         + "hanzo ramen 2 (半蔵門 ラーメン 星2)\n"
                         + "hanzo sakana 3 (半蔵門 魚 星3)\n"
                         + "ropp miso 2 (六本木 味噌ラーメン 星2)\n"
@@ -111,24 +109,45 @@ function receivedMessage(event) {
       return      
     }
     
+    //make error
+    let err = "this is sample query\n"
+    err += _.sample(argConfig.firstList)
+    err += " "
+    err += _.sample(argConfig.secondList)
+    err += " "
+    err += _.sample(argConfig.thirdList) 
+    
     var kekka = messageText.split(" ");
     var match = false
     match = _.find(argConfig.firstList, function(obj){ return obj == kekka[0] })
     if(!match) {
-      sendTextMessage(senderID, "these locations are available [" + argConfig.firstList.join(',') + "]");
+      sendTextMessage(senderID, "these {location}s are available [" + argConfig.firstList.join(', ') + "]");
+      sendTextMessage(senderID, "plz send like this again\n[location] [food-type] [review-star]");
+      sendTextMessage(senderID, err );
       return
-    }
-
-    match = _.find(argConfig.secondList, function(obj){ return obj == kekka[1] })
-    if(!match) {
-      sendTextMessage(senderID, "these food tyes are available [" + argConfig.secondList.join(',') + "]");
-      return
-    }
-
+    } else {
+      match = _.find(argConfig.secondList, function(obj){ return obj == kekka[1] })
+      if(!match) {
+        sendTextMessage(senderID, "these {food-type}s are available [" + argConfig.secondList.join(', ') + "]");
+        sendTextMessage(senderID, "plz send like this again\n[location] [food-type] [review-star]");
+        sendTextMessage(senderID, err );
+        return
+      } else {
+        match = _.find(argConfig.thirdList, function(obj){ return obj == kekka[2] })
+        if(!match) {
+          sendTextMessage(senderID, "these {review-star}s are available [" + argConfig.thirdList.join(', ') + "]");
+          sendTextMessage(senderID, "plz send like this again\n[location] [food-type] [review-star]");
+          sendTextMessage(senderID, err );
+          return
+        } else {
+          // SUCCEED CHECK ARGS
+          sendRamen(senderID, messageText)
+          sendTextMessage(senderID, messageText);          
+        }       
+      }      
+    } 
     // If we receive a text message, check to see if it matches a keyword
     // and send back the template example. Otherwise, just echo the text we received.
-    sendRamen(senderID, messageText)
-    sendTextMessage(senderID, messageText);
   } else if (messageAttachments) {
     sendTextMessage(senderID, "plz text me!");
   }
@@ -146,6 +165,7 @@ function sendTextMessage(recipientId, messageText) {
   callSendAPI(messageData);
 }
 
+/*
 var elem0 = {
 title: "Jirorian",
 subtitle: "Next-generation Ramen Restaurant",
@@ -161,39 +181,43 @@ var buttons = [
               title: "Call Postback",
               payload: "Payload for first bubble",
             }]
+*/
 
 function sendRamen(recipientId, messageText) {
      
+  var kekka = messageText.split(" ");
   
-  
-    var messageData = {
-    recipient: {
-      id: recipientId
-    },
-    message: {
+  var res1 = _.where(dataConfig.data, {loc: kekka[0]})
+  console.log('--res189--')
+  console.log(res1)
+  var res2 = _.where(res1, {food: kekka[1]})
+  console.log('--res192--')
+  console.log(res2)
+  console.log('--res194--')
+  console.log(kekka)
+  var res3 = _.where(res2, {star:  Number(kekka[2])})
+  console.log('--res195--')
+  console.log(res3)
+
+  var messageData = {}
+  if(res3.length > 0) {
+    var elems = []
+    res3.forEach(function(shop){
+      elems.push(shop.elem)      
+    })
+    
+      messageData.recipient = {id:recipientId}
+      messageData.message = {
       attachment: {
         type: "template",
         payload: {
           template_type: "generic",
-          elements: [
-            {
-              title: "Jirorian",subtitle: "Next-generation Ramen Restaurant",
-              item_url: "https://tabelog.com/tokyo/A1308/A130801/13184422/",               
-              image_url: "https://tabelog.ssl.k-img.com/restaurant/images/Rvw/40445/640x640_rect_40445111.jpg",
-            //buttons: ,
-          }, {
-            title: "touch",
-            subtitle: "Your Hands, Now in VR",
-            item_url: "https://www.oculus.com/en-us/touch/",               
-            image_url: "http://messengerdemo.parseapp.com/img/touch.png",
-            
-          }, elem0,elem0,elem0,elem0,elem0,elem0,elem0,elem0]
+          elements: elems
         }
       }
     }
-  };  
-
-  callSendAPI(messageData);  
+    callSendAPI(messageData);  
+  }
 }
 
 function callSendAPI(messageData) {
